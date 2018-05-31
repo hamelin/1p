@@ -51,8 +51,12 @@ function ensure_login()
 {
     local msg_error=$(1p_op "get item" __dummy__ 2>&1)
     if grep --quiet 'not currently signed in\|Authentication required' <<<"$msg_error" && [ "$action" != "logout" ]; then
-        local new_token_auth=$(op signin --output=raw $domain $email $secret_key) || exit $?
-        set_token_auth "$new_token_auth"
+        local p=$(mktemp)
+        op signin --output=raw $domain $email $secret_key >$p && \
+            set_token_auth $(< $p)
+        local x=$?
+        rm -f $p
+        [ "$x" -ne 0 ] && exit $x
     fi
 }
 
