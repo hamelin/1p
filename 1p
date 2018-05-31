@@ -1,6 +1,13 @@
 #!/bin/bash
 
 
+function unimplemented()
+{
+    echo "UNIMPLEMENTED"
+    exit 127
+}
+
+
 function 1p_op()
 {
     cmd="$1"
@@ -56,11 +63,69 @@ function unquote()
 }
 
 
+function make_map_vaults()
+{
+    local p=$(mktemp)
+    1p_op "list vaults" | jq --compact-output 'map({"key": .uuid, "value": .name}) | from_entries' >$p && \
+        map_vaults=$(< $p)
+    local x=$?
+    rm -f $p
+    [ "$x" -ne 0 ] && exit $x
+}
+
+
+function list_items()
+{
+    make_map_vaults
+    local p=$(mktemp)
+    1p_op "list items" | \
+        jq --compact-output --argjson map_vaults "$map_vaults" \
+            'map(
+                {
+                    "uuid"    : .uuid,
+                    "vault"   : $map_vaults[.vaultUuid],
+                    "name"    : .overview.title,
+                    "trashed" : .trashed
+                }
+            )' >$p
+    local x=$?
+    local list_reformatted=$(<$p)
+    rm -f $p
+    [ "$x" -ne 0 ] && exit $x
+
+    if [ "$format" = "json" ]; then
+        jq '.' <<<"$list_reformatted"
+    else
+        local len_uuid=$(jq 'map(.uuid | length) | max' <<<"$list_reformatted")
+        local len_vault=$(jq 'map(.vault | length) | max' <<<"$list_reformatted")
+        jq --raw-output 'sort_by([.vault, .name]) | .[] | [if .trashed == "N" then " " else "X" end, .uuid, .vault, .name] | join(";;;;")' <<<"$list_reformatted" | \
+            awk -F ';;;;' "\
+                BEGIN{ printf(\"    %-${len_uuid}s   %-${len_vault}s   %s\\n\", \"UUID\", \"VAULT\", \"NAME\") } \
+                1{ printf(\"%s   %-${len_uuid}s   %-${len_vault}s   %s\\n\", \$1, \$2, \$3, \$4) }"
+    fi
+}
+
+
+function get_item()
+{
+    unimplemented
+}
+
+
+function set_item()
+{
+    unimplemented
+}
+
+
 function do_default()
 {
     ensure_login
-    # TODO
-    echo "Logged in"
+    case "$num_params" in
+        0) list_items ;;
+        1) get_item   ;;
+        *) set_item   ;;
+    esac
 }
 
 
@@ -82,8 +147,26 @@ vault=""
 set -- $(getopt --name "$0" --options hjnpuV:0 --longoptions help,json,notes,password,raw,setup,user,vault,logout: -- $@) || exit $?
 while [ -n "$1" ]; do
     case "$1" in
+        # -h | --help)
+        #     action="doc"
+        #     ;;
+        -j | --json)
+            format="json"
+            ;;
+        -n | --notes)
+            item="notes"
+            ;;
+        -p | --password)
+            item="password"
+            ;;
+        --raw)
+            format="raw"
+            ;;
         --setup)
             is_setup_initial="yes"
+            ;;
+        -u | --user)
+            item="user"
             ;;
         -0 | --logout)
             action="logout"
