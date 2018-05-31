@@ -82,6 +82,9 @@ vault=""
 set -- $(getopt --name "$0" --options hjnpuV:0 --longoptions help,json,notes,password,raw,setup,user,vault,logout: -- $@) || exit $?
 while [ -n "$1" ]; do
     case "$1" in
+        --setup)
+            is_setup_initial="yes"
+            ;;
         -0 | --logout)
             action="logout"
             ;;
