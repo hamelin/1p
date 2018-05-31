@@ -1,0 +1,117 @@
+#!/bin/bash
+
+
+function 1p_op()
+{
+    cmd="$1"
+    shift
+    op $cmd --session="$token_auth" $@
+}
+
+
+function setup_initial()
+{
+    echo "Hello! Before we start, I need a few parameters from you. You can look them up"
+    echo "in the browser or desktop version of 1Password, typically somewhere around the"
+    echo "Preferences dialog."
+    echo
+    read -p "Domain name: " domain && \
+        read -p "E-mail address: " email && \
+        read -p "Secret key: " secret_key
+    cat > $path_config <<-CONFIG
+	{
+	    "domain": "$domain",
+	    "email": "$email",
+	    "secret_key": "$secret_key",
+	    "token_auth": ""
+	}
+	CONFIG
+    token_auth=""
+    echo "Persistent configuration saved."
+}
+
+
+function set_token_auth()
+{
+    token_auth="$1"
+    local p=$(mktemp)
+    jq ".token_auth = \"$token_auth\"" $path_config >$p
+    mv $p $path_config
+}
+
+
+function ensure_login()
+{
+    local msg_error=$(1p_op "get item" __dummy__ 2>&1)
+    if grep --quiet 'not currently signed in\|Authentication required' <<<"$msg_error" && [ "$action" != "logout" ]; then
+        local new_token_auth=$(op signin --output=raw $domain $email $secret_key) || exit $?
+        set_token_auth "$new_token_auth"
+    fi
+}
+
+
+function unquote()
+{
+    echo "$1" | xargs
+}
+
+
+function do_default()
+{
+    ensure_login
+    # TODO
+    echo "Logged in"
+}
+
+
+function do_logout()
+{
+    1p_op "signout" >/dev/null 2>&1
+    set_token_auth ""
+    exit 0
+}
+
+
+num_params=""
+declare -a params
+is_setup_initial=""
+action="default"
+format=""
+item="all"
+vault=""
+set -- $(getopt --name "$0" --options hjnpuV:0 --longoptions help,json,notes,password,raw,setup,user,vault,logout: -- $@) || exit $?
+while [ -n "$1" ]; do
+    case "$1" in
+        --setup)
+            is_setup_initial="yes"
+            ;;
+        -0 | --logout)
+            action="logout"
+            ;;
+        --)
+            num_params=0
+            ;;
+        *)
+            if [ -z "$num_params" ]; then
+                echo "Unknown parameter: $opt"
+                echo "Check out documentation by invoking $0 --help."
+                exit 1
+            else
+                params[$((num_params++))]=$(unquote "$1")
+            fi
+    esac
+    shift
+done
+
+path_config="$HOME/.1p"
+declare -a config
+if [ ! -f "$path_config" -o -n "$is_setup_initial" ]; then
+    setup_initial
+else
+    for name_config in domain email secret_key token_auth; do
+        value=$(jq --raw-output ".$name_config" $path_config)
+        eval "$name_config='$value'"
+    done
+fi
+
+eval "do_$action"
