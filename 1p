@@ -193,11 +193,20 @@ function set_item()
 }
 
 
-function do_default()
+function split_title_vault()
 {
     if [ -n "${params[0]}" ]; then
-        eval $(jq --raw-input --raw-output 'split("@") | "local title=\"\(.[0])\"\nlocal vault=\"\(.[1] // "")\"\n"' <<<"${params[0]}")
+        eval $(jq --raw-input --raw-output 'split("@") | "title=\"\(.[0])\"\nvault=\"\(.[1] // "")\"\n"' <<<"${params[0]}")
+    else
+        title=""
+        vault=""
     fi
+}
+
+
+function do_default()
+{
+    split_title_vault
     ensure_login
     make_map_vaults
 
