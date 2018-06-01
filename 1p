@@ -80,7 +80,6 @@ function make_map_vaults()
 
 function list_items()
 {
-    make_map_vaults
     local p=$(mktemp)
     1p_op "list items" | \
         jq --compact-output --argjson map_vaults "$map_vaults" \
@@ -132,7 +131,6 @@ function get_item_from_1p()
 
 function get_item()
 {
-    make_map_vaults
     get_item_from_1p | \
         (
             if [ "$format" = "json" ]; then
@@ -162,6 +160,8 @@ function do_default()
         eval $(jq --raw-input --raw-output 'split("::") | "local title=\"\(.[0])\"\nlocal vault=\"\(.[1] // "")\"\n"' <<<"${params[0]}")
     fi
     ensure_login
+    make_map_vaults
+
     case "$num_params" in
         0) list_items ;;
         1) get_item   ;;
