@@ -227,7 +227,7 @@ while [ -n "$1" ]; do
             ;;
         *)
             if [ -z "$num_params" ]; then
-                echo "Unknown parameter: $opt"
+                echo "Unknown parameter: $1"
                 echo "Check out documentation by invoking $0 --help."
                 exit 1
             else
