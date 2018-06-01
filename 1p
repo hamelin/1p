@@ -114,19 +114,21 @@ function get_item_from_1p()
     if [ -n "$vault" ]; then
         opt_vault="--vault=$vault"
     fi
-    (1p_op "get item" "$title" $opt_vault || exit $?) | \
-        jq --compact-output --argjson map_vaults "$map_vaults" '
-            def field_value(name_field): (.details.fields[] | select(.name == name_field) | .value) // "" ;
-            {
-                "uuid":        .uuid,
-                "username":    field_value("username"),
-                "password":    field_value("password"),
-                "notes":       (.details.notesPlain // ""),
-                "title":       (.overview.title // ""),
-                "url":         (.overview.url // ""),
-                "vault":       ($map_vaults[.vaultUuid] // ""),
-                "details_raw": .details
-            }'
+    local p=$(mktemp)
+    trap "rm -f $p" EXIT
+    1p_op "get item" "$title" $opt_vault >$p || exit $?
+    jq --compact-output --argjson map_vaults "$map_vaults" '
+        def field_value(name_field): (.details.fields[] | select(.name == name_field) | .value) // "" ;
+        {
+            "uuid":        .uuid,
+            "username":    field_value("username"),
+            "password":    field_value("password"),
+            "notes":       (.details.notesPlain // ""),
+            "title":       (.overview.title // ""),
+            "url":         (.overview.url // ""),
+            "vault":       ($map_vaults[.vaultUuid] // ""),
+            "details_raw": .details
+        }' <$p
 }
 
 
@@ -152,7 +154,9 @@ function get_item()
 function set_item()
 {
     local new_value="${params[1]}"
-    local item_raw=$(get_item_from_1p)
+    local p=$(mktemp)
+    get_item_from_1p >$p || exit $?
+    local item_raw=$(cat $p && rm $p)
     local uuid_orig=$(jq --raw-output '.uuid' <<<"$item_raw")
     local url=$(jq --raw-output '.url' <<<"$item_raw")
     local title=$(jq --raw-output '.title' <<<"$item_raw")
