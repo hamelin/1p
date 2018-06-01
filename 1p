@@ -116,7 +116,7 @@ function get_item_from_1p()
     fi
     (1p_op "get item" "$title" $opt_vault || exit $?) | \
         jq --compact-output --argjson map_vaults "$map_vaults" '
-            def field_value(name_field): (.details.fields[] | select(.designation == name_field) | .value) // "" ;
+            def field_value(name_field): (.details.fields[] | select(.name == name_field) | .value) // "" ;
             {
                 "username":    field_value("username"),
                 "password":    field_value("password"),
