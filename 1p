@@ -88,8 +88,7 @@ function list_items()
                 {
                     "uuid"    : .uuid,
                     "vault"   : $map_vaults[.vaultUuid],
-                    "name"    : .overview.title,
-                    "trashed" : .trashed
+                    "name"    : .overview.title
                 }
             )' >$p
     local x=$?
@@ -104,8 +103,8 @@ function list_items()
         local len_vault=$(jq 'map(.vault | length) | max' <<<"$list_reformatted")
         jq --raw-output 'sort_by([.vault, .name]) | .[] | [if .trashed == "N" then " " else "X" end, .uuid, .vault, .name] | join("::")' <<<"$list_reformatted" | \
             awk -F '::' "\
-                BEGIN{ printf(\"    %-${len_uuid}s   %-${len_vault}s   %s\\n\", \"UUID\", \"VAULT\", \"NAME\") } \
-                1{ printf(\"%s   %-${len_uuid}s   %-${len_vault}s   %s\\n\", \$1, \$2, \$3, \$4) }"
+                BEGIN{ printf(\"%-${len_uuid}s   %-${len_vault}s   %s\\n\", \"UUID\", \"VAULT\", \"NAME\") } \
+                1{ printf(\"%-${len_uuid}s   %-${len_vault}s   %s\\n\", \$1, \$2, \$3) }"
     fi
 }
 
