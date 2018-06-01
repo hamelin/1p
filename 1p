@@ -111,7 +111,22 @@ function list_items()
 
 function get_item_from_1p()
 {
-    1p_op "get item" "${params[0]}" || exit $?
+    local opt_vault=""
+    if [ -n "$vault" ]; then
+        opt_vault="--vault=$vault"
+    fi
+    (1p_op "get item" "$title" $opt_vault || exit $?) | \
+        jq --compact-output --argjson map_vaults "$map_vaults" '
+            def field_value(name_field): (.details.fields[] | select(.designation == name_field) | .value) // "" ;
+            {
+                "username":    field_value("username"),
+                "password":    field_value("password"),
+                "notes":       (.details.notesPlain // ""),
+                "title":       (.overview.title // ""),
+                "url":         (.overview.url // ""),
+                "vault":       ($map_vaults[.vaultUuid] // ""),
+                "details_raw": .details
+            }'
 }
 
 
@@ -119,19 +134,9 @@ function get_item()
 {
     make_map_vaults
     get_item_from_1p | \
-        jq --compact-output --argjson map_vaults "$map_vaults" '
-            def field_value(name_field): (.details.fields[] | select(.designation == name_field) | .value) // "" ;
-            {
-                "username": field_value("username"),
-                "password": field_value("password"),
-                "notes": (.details.notesPlain // ""),
-                "title": (.overview.title // ""),
-                "url":   (.overview.url // ""),
-                "vault": ($map_vaults[.vaultUuid] // ""),
-            }' | \
         (
             if [ "$format" = "json" ]; then
-                jq
+                jq 'del(.details_raw)'
             else
                 jq --raw-output --arg item "$item" '.[$item]' | (
                     if [ "$is_copy_or_echo" = "echo" ]; then
@@ -153,6 +158,9 @@ function set_item()
 
 function do_default()
 {
+    if [ -n "${params[0]}" ]; then
+        eval $(jq --raw-input --raw-output 'split("::") | "local title=\"\(.[0])\"\nlocal vault=\"\(.[1] // "")\"\n"' <<<"${params[0]}")
+    fi
     ensure_login
     case "$num_params" in
         0) list_items ;;
