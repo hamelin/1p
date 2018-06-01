@@ -80,6 +80,7 @@ function make_map_vaults()
 
 function list_items()
 {
+    make_map_vaults
     local p=$(mktemp)
     1p_op "list items" | \
         jq --compact-output --argjson map_vaults "$map_vaults" \
@@ -122,24 +123,49 @@ function get_item_from_1p()
     build_opt_vault
     local p=$(mktemp)
     trap "rm -f $p" EXIT
-    1p_op "get item" "$title" $opt_vault >$p || exit $?
-    jq --compact-output --argjson map_vaults "$map_vaults" '
-        def field_value(name_field): (.details.fields[] | select(.name == name_field) | .value) // "" ;
-        {
-            "uuid":        .uuid,
-            "username":    field_value("username"),
-            "password":    field_value("password"),
-            "notes":       (.details.notesPlain // ""),
-            "title":       (.overview.title // ""),
-            "url":         (.overview.url // ""),
-            "vault":       ($map_vaults[.vaultUuid] // ""),
-            "details_raw": .details
-        }' <$p
+    1p_op "get item" "$title" $opt_vault >$p
+    x=$?
+    if [ $x -eq 0 ]; then
+        jq --compact-output --argjson map_vaults "$map_vaults" '
+            def field_value(name_field): ((.details.fields // [])[] | select(.name == name_field) | .value) // "" ;
+            {
+                "uuid":        .uuid,
+                "username":    field_value("username"),
+                "password":    field_value("password"),
+                "notes":       (.details.notesPlain // ""),
+                "title":       (.overview.title // ""),
+                "url":         (.overview.url // ""),
+                "vault":       ($map_vaults[.vaultUuid] // .vaultUuid),
+                "details_raw": .details
+            }' <$p
+    else
+        return $x
+    fi
+}
+
+
+function get_item_from_1p_or_create()
+{
+    if ! get_item_from_1p 2>/dev/null; then
+        cat <<-SKELETON
+		{
+		    "uuid":        "",
+		    "username":    "",
+		    "password":    "",
+		    "notes":       "",
+		    "title":       "$title",
+		    "url":         "",
+		    "vault":       "$vault",
+		    "details_raw": $(1p_op "get template" Login)
+		}
+		SKELETON
+    fi
 }
 
 
 function get_item()
 {
+    make_map_vaults
     get_item_from_1p | \
         (
             if [ "$format" = "json" ]; then
