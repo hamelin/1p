@@ -255,6 +255,36 @@ function do_default()
 }
 
 
+function do_edit()
+{
+    ensure_login
+    split_title_vault
+    map_vaults='{}'
+    if [ -n "title" ]; then
+        if [ -z "$EDITOR" ]; then
+            EDITOR="vi"
+        fi
+
+        local p=$(mktemp)
+        trap "rm -f $p $p.raw" EXIT
+        get_item_from_1p_or_create >"$p.raw" || exit $?
+        jq --raw-output '.notes' "$p.raw" >"$p"
+        eval "$EDITOR $p" || exit $?
+
+        if ! diff -q $p <(jq --raw-output '.notes' "$p.raw") 2>/dev/null; then
+            uuid_orig=$(jq --raw-output '.uuid' "$p.raw")
+            url=$(jq --raw-output '.url' "$p.raw")
+            vault=$(jq --raw-output '.vault' "$p.raw")
+            details=$(jq --raw-output --arg notes "$(cat "$p")" '.details_raw | .notesPlain = $notes' "$p.raw")
+            modify_item
+        fi
+    else
+        echo "Missing name of item to edit notes for."
+        exit 20
+    fi
+}
+
+
 function do_rm()
 {
     ensure_login
@@ -300,7 +330,7 @@ format=""
 item="password"
 is_copy_or_echo="copy"
 
-eval set -- $(getopt --name "$0" --options 'CETUhjnpu0' --longoptions 'copy,echo,title,url,help,json,notes,password,raw,rm,setup,user,logout:' -- "$@") || exit $?
+eval set -- $(getopt --name "$0" --options 'CETUehjnpu0' --longoptions 'copy,echo,title,url,edit,help,json,notes,password,raw,rm,setup,user,logout:' -- "$@") || exit $?
 while [ -n "$1" ]; do
     case "$1" in
         # -h | --help)
@@ -317,6 +347,9 @@ while [ -n "$1" ]; do
             ;;
         -U | --url)
             item="url"
+            ;;
+        -e | --edit)
+            action="edit"
             ;;
         -j | --json)
             format="json"
