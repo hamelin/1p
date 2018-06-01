@@ -184,10 +184,9 @@ is_setup_initial=""
 action="default"
 format=""
 item="password"
-vault=""
 is_copy_or_echo="copy"
 
-eval set -- $(getopt --name "$0" --options 'CEThjnpuV:0' --longoptions 'copy,echo,help,json,notes,password,raw,setup,user,vault,logout:' -- "$@") || exit $?
+eval set -- $(getopt --name "$0" --options 'CEThjnpu0' --longoptions 'copy,echo,help,json,notes,password,raw,setup,user,logout:' -- "$@") || exit $?
 while [ -n "$1" ]; do
     case "$1" in
         # -h | --help)
