@@ -183,21 +183,36 @@ function get_item()
 }
 
 
+function modify_item()
+{
+    build_opt_vault
+    if 1p_op "create item" Login $(echo "$details" | op encode) --title="$title" --url="$url" $opt_vault >/dev/null; then
+        if [ -n "$uuid_orig" ]; then
+            1p_op "delete item" "$uuid_orig"
+        fi
+    fi
+}
+
+
 function set_item()
 {
-    local new_value="${params[1]}"
+    map_vaults='{}'
     local p=$(mktemp)
-    get_item_from_1p >$p || exit $?
+    get_item_from_1p_or_create >$p || exit $?
+    trap "rm -f $p" EXIT
     local item_raw=$(cat $p && rm $p)
-    local uuid_orig=$(jq --raw-output '.uuid' <<<"$item_raw")
-    local url=$(jq --raw-output '.url' <<<"$item_raw")
-    local title=$(jq --raw-output '.title' <<<"$item_raw")
-    local vault=$(jq --raw-output '.vault' <<<"$item_raw")
-    local details=$(jq --raw-output '.details_raw' <<<"$item_raw")
+    uuid_orig=$(jq --raw-output '.uuid' <<<"$item_raw")
+    url=$(jq --raw-output '.url' <<<"$item_raw")
+    title=$(jq --raw-output '.title' <<<"$item_raw")
+    vault=$(jq --raw-output '.vault' <<<"$item_raw")
+    details=$(jq --raw-output '.details_raw' <<<"$item_raw")
+
+    local new_value="${params[1]}"
     case "$item" in
         password | username)
             details=$(jq --arg attr "$item" --arg new_value "$new_value" \
-                '.fields = (.fields | map(if .name == $attr then .value = $new_value else . end))' \
+                --argjson map_type '{"username": "T", "password": "P"}' \
+                '.fields = ([.fields[] | select(.name != $attr)] + [{"name": $attr, "designation": $attr, "type": $map_type[$attr], "value": $new_value}])' \
                 <<<"$details")
             ;;
         notes)
@@ -211,11 +226,8 @@ function set_item()
             exit 10
             ;;
     esac
-    if 1p_op "create item" Login $(echo "$details" | op encode) --title="$title" --url="$url" --vault="$vault" >/dev/null; then
-        x=$?
-        1p_op "delete item" "$uuid_orig"
-        exit $x
-    fi
+
+    modify_item
 }
 
 
@@ -234,7 +246,6 @@ function do_default()
 {
     split_title_vault
     ensure_login
-    make_map_vaults
 
     case "$num_params" in
         0) list_items ;;
