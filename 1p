@@ -118,6 +118,7 @@ function get_item_from_1p()
         jq --compact-output --argjson map_vaults "$map_vaults" '
             def field_value(name_field): (.details.fields[] | select(.name == name_field) | .value) // "" ;
             {
+                "uuid":        .uuid,
                 "username":    field_value("username"),
                 "password":    field_value("password"),
                 "notes":       (.details.notesPlain // ""),
@@ -150,7 +151,35 @@ function get_item()
 
 function set_item()
 {
-    unimplemented
+    local new_value="${params[1]}"
+    local item_raw=$(get_item_from_1p)
+    local uuid_orig=$(jq --raw-output '.uuid' <<<"$item_raw")
+    local url=$(jq --raw-output '.url' <<<"$item_raw")
+    local title=$(jq --raw-output '.title' <<<"$item_raw")
+    local vault=$(jq --raw-output '.vault' <<<"$item_raw")
+    local details=$(jq --raw-output '.details_raw' <<<"$item_raw")
+    case "$item" in
+        password | username)
+            details=$(jq --arg attr "$item" --arg new_value "$new_value" \
+                '.fields = (.fields | map(if .name == $attr then .value = $new_value else . end))' \
+                <<<"$details")
+            ;;
+        notes)
+            details=$(jq --arg new_value "$new_value" '.notesPlain = $new_value' <<<"$details")
+            ;;
+        url | title)
+            eval "$item=\"$new_value\""
+            ;;
+        *)
+            echo "Don't know how to set attribute \`$item'."
+            exit 10
+            ;;
+    esac
+    if 1p_op "create item" Login $(echo "$details" | op encode) --title="$title" --url="$url" --vault="$vault" >/dev/null; then
+        x=$?
+        1p_op "delete item" "$uuid_orig"
+        exit $x
+    fi
 }
 
 
