@@ -108,12 +108,18 @@ function list_items()
 }
 
 
-function get_item_from_1p()
+function build_opt_vault()
 {
     local opt_vault=""
     if [ -n "$vault" ]; then
         opt_vault="--vault=$vault"
     fi
+}
+
+
+function get_item_from_1p()
+{
+    build_opt_vault
     local p=$(mktemp)
     trap "rm -f $p" EXIT
     1p_op "get item" "$title" $opt_vault >$p || exit $?
