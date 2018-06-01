@@ -112,18 +112,22 @@ function list_items()
 function get_item_from_1p()
 {
     1p_op "get item" "${params[0]}" |
-        jq --compact-output '
-            def field_value(name_field): (.fields[] | select(.designation == name_field) | .value) // "" ;
-            .details | {
+        jq --compact-output --argjson map_vaults "$map_vaults" '
+            def field_value(name_field): (.details.fields[] | select(.designation == name_field) | .value) // "" ;
+            {
                 "username": field_value("username"),
                 "password": field_value("password"),
-                "notes": (.notesPlain // "")
+                "notes": (.details.notesPlain // ""),
+                "title": (.overview.title // ""),
+                "url":   (.overview.url // ""),
+                "vault": ($map_vaults[.vaultUuid] // ""),
             }' || exit $?
 }
 
 
 function get_item()
 {
+    make_map_vaults
     get_item_from_1p | (
         if [ "$format" = "json" ]; then
             jq
