@@ -190,6 +190,9 @@ while [ -n "$1" ]; do
         -E | --echo)
             is_copy_or_echo="echo"
             ;;
+        -T | --title)
+            item="title"
+            ;;
         -j | --json)
             format="json"
             ;;
