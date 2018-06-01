@@ -12,7 +12,7 @@ function 1p_op()
 {
     cmd="$1"
     shift
-    op $cmd --session="$token_auth" $@
+    op $cmd --session="$token_auth" "$@"
 }
 
 
@@ -110,9 +110,34 @@ function list_items()
 }
 
 
+function get_item_from_1p()
+{
+    1p_op "get item" "${params[0]}" |
+        jq --compact-output '
+            def field_value(name_field): (.fields[] | select(.designation == name_field) | .value) // "" ;
+            .details | {
+                "username": field_value("username"),
+                "password": field_value("password"),
+                "notes": (.notesPlain // "")
+            }' || exit $?
+}
+
+
 function get_item()
 {
-    unimplemented
+    get_item_from_1p | (
+        if [ "$format" = "json" ]; then
+            jq
+        else
+            jq --raw-output --arg item "$item" '.[$item]' | (
+                if [ "$is_copy_or_echo" = "echo" ]; then
+                    cat
+                else
+                    tr -d "\n" | xsel -ib
+                fi
+            )
+        fi
+    ) || exit $?
 }
 
 
@@ -146,14 +171,22 @@ declare -a params
 is_setup_initial=""
 action="default"
 format=""
-item="all"
+item="password"
 vault=""
-set -- $(getopt --name "$0" --options hjnpuV:0 --longoptions help,json,notes,password,raw,setup,user,vault,logout: -- $@) || exit $?
+is_copy_or_echo="copy"
+
+eval set -- $(getopt --name "$0" --options 'CEhjnpuV:0' --longoptions 'copy,echo,help,json,notes,password,raw,setup,user,vault,logout:' -- "$@") || exit $?
 while [ -n "$1" ]; do
     case "$1" in
         # -h | --help)
         #     action="doc"
         #     ;;
+        -C | --copy)
+            is_copy_or_echo="copy"
+            ;;
+        -E | --echo)
+            is_copy_or_echo="echo"
+            ;;
         -j | --json)
             format="json"
             ;;
@@ -170,7 +203,7 @@ while [ -n "$1" ]; do
             is_setup_initial="yes"
             ;;
         -u | --user)
-            item="user"
+            item="username"
             ;;
         -0 | --logout)
             action="logout"
