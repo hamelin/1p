@@ -157,7 +157,7 @@ function set_item()
 function do_default()
 {
     if [ -n "${params[0]}" ]; then
-        eval $(jq --raw-input --raw-output 'split("::") | "local title=\"\(.[0])\"\nlocal vault=\"\(.[1] // "")\"\n"' <<<"${params[0]}")
+        eval $(jq --raw-input --raw-output 'split("@") | "local title=\"\(.[0])\"\nlocal vault=\"\(.[1] // "")\"\n"' <<<"${params[0]}")
     fi
     ensure_login
     make_map_vaults
