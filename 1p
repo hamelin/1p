@@ -261,7 +261,22 @@ function do_rm()
     split_title_vault
     if [ -n "$title" ]; then
         build_opt_vault
-        1p_op "delete item" "$title" $opt_vault
+        local p=$(mktemp)
+        trap "rm -f $p" EXIT
+        if ! 1p_op "delete item" "$title" $opt_vault 2>$p; then
+            # 1Password's op is stupid: it confounds trashed and non-trashed
+            # items when trying to delete. Since we are forced to
+            # create+delete in order to modify an item, we obviously become
+            # stuck with a large set of identically-named items, making the
+            # first delete fail unduly often. Fortunately, this first delete
+            # shows us the UUIDs of colliding objects, so we can delete all of
+            # them thereafter. Emptying the trash, either through the browser
+            # or the desktop app, finally removes all these spurious dupes
+            # from the database altogether.
+            for uuid in $(jq --raw-input --raw-output 'match("op delete item ([0-9a-z]+)").captures[0].string' $p); do
+                1p_op "delete item" "$uuid"
+            done
+        fi
     else
         echo "Missing name of item to remove."
         exit 20
@@ -354,3 +369,4 @@ else
 fi
 
 eval "do_$action"
+exit $?
