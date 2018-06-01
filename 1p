@@ -218,6 +218,20 @@ function do_default()
 }
 
 
+function do_rm()
+{
+    ensure_login
+    split_title_vault
+    if [ -n "$title" ]; then
+        build_opt_vault
+        1p_op "delete item" "$title" $opt_vault
+    else
+        echo "Missing name of item to remove."
+        exit 20
+    fi
+}
+
+
 function do_logout()
 {
     1p_op "signout" >/dev/null 2>&1
@@ -234,7 +248,7 @@ format=""
 item="password"
 is_copy_or_echo="copy"
 
-eval set -- $(getopt --name "$0" --options 'CETUhjnpu0' --longoptions 'copy,echo,title,url,help,json,notes,password,raw,setup,user,logout:' -- "$@") || exit $?
+eval set -- $(getopt --name "$0" --options 'CETUhjnpu0' --longoptions 'copy,echo,title,url,help,json,notes,password,raw,rm,setup,user,logout:' -- "$@") || exit $?
 while [ -n "$1" ]; do
     case "$1" in
         # -h | --help)
@@ -263,6 +277,9 @@ while [ -n "$1" ]; do
             ;;
         --raw)
             format="raw"
+            ;;
+        --rm)
+            action="rm"
             ;;
         --setup)
             is_setup_initial="yes"
