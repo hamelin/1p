@@ -347,6 +347,19 @@ $min_length characters, and I don't care whether you like it.
 TOOSHORT
         length_total=$min_length
     fi
+
+    length_nonlower=$(( $num_uppers + $num_digits + $num_symbols ))
+    if [ $length_nonlower -gt $length_total ]; then
+        cat 2>/dev/null <<IMPOSSIBLE
+Sigh -- apparently, math is hard. You want a password with $num_uppers uppercase
+letters, $num_digits digits and $num_symbols symbols, but composed of no more
+than $length_total characters. Do the math: it's impossible. I will thus
+generate a longer password, $length_nonlower charcters long, in order to
+satisfy the former constraints.
+IMPOSSIBLE
+        $length_total=$length_nonlower
+    fi
+
     if [ $num_uppers -lt 1 -a $num_digits -lt 1 -a $num_symbols -lt 1 -a $length_total -lt 16 ]; then
         cat 2>/dev/null <<JUSTBAD
 You know, I've seen the XKCD cartoon and I know of the common password best
