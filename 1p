@@ -33,6 +33,7 @@ function setup_initial()
 	    "token_auth": ""
 	}
 	CONFIG
+    chmod 600 $path_config
     token_auth=""
     echo "Persistent configuration saved."
 }
