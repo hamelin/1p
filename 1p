@@ -326,7 +326,7 @@ function do_generate()
     eval $(
         jq --raw-output 'split(":") | map(try tonumber catch null) |
             "length_total=\(.[0] // 16); num_uppers=\(.[1] // 1); num_digits=\(.[2] // 1); num_symbols=\(.[3] // 1)"' \
-            <<<"\"$length\""
+            <<<"\"$reqs\""
     ) || exit $?
     local max_length=40
     local min_length=8
@@ -454,20 +454,17 @@ length=16
 prefix=""
 suffix=""
 
-eval set -- $(getopt --name "$0" --options 'CEN:P:S:TUeghjnpu0' --longoptions 'copy,echo,title,url,edit,generate,length:,prefix:,suffix:,help,json,notes,password,raw,rm,setup,user,logout:' -- "$@") || exit $?
+eval set -- $(getopt --name "$0" --options 'CEN:P:S:TUeghjnpu0' --longoptions 'copy,echo,title,url,edit,generate,reqs:,prefix:,suffix:,help,json,notes,password,raw,rm,setup,user,logout:' -- "$@") || exit $?
 while [ -n "$1" ]; do
     case "$1" in
-        # -h | --help)
-        #     action="doc"
-        #     ;;
         -C | --copy)
             is_copy_or_echo="copy"
             ;;
         -E | --echo)
             is_copy_or_echo="echo"
             ;;
-        -N | --length)
-            length="$2"
+        -N | --reqs)
+            reqs="$2"
             shift
             ;;
         -P | --prefix)
