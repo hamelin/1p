@@ -454,6 +454,13 @@ function do_logout()
 }
 
 
+function do_version()
+{
+    echo "|||TAG|||"
+    exit 0
+}
+
+
 #--- Entry point ------------------------------------------------------------
 
 num_params=""
@@ -464,7 +471,7 @@ format=""
 item="password"
 is_copy_or_echo="copy"
 
-eval set -- $(getopt --name "$0" --options 'CETUehjnpu0' --longoptions 'copy,echo,title,url,edit,help,json,notes,password,raw,rm,setup,user,logout:' -- "$@") || exit $?
+eval set -- $(getopt --name "$0" --options 'CETUVehjnpu0' --longoptions 'copy,echo,title,url,version,edit,help,json,notes,password,raw,rm,setup,user,logout:' -- "$@") || exit $?
 while [ -n "$1" ]; do
     case "$1" in
         -C | --copy)
@@ -508,6 +515,9 @@ while [ -n "$1" ]; do
             ;;
         -0 | --logout)
             action="logout"
+            ;;
+        -V | --version)
+            action="version"
             ;;
         --)
             num_params=0
