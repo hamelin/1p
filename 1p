@@ -448,6 +448,154 @@ function do_rm()
 }
 
 
+function do_help()
+{
+    cat <<HELP
+$0 -- A more usabel command line interface to 1Password
+
+
+== Usages ==
+
+1. $0
+    - Lists all items over all accessible vaults.
+2. $0 [-C|-E] [-j|-u|-p|-n|-U|-T] <title>[@<vault>]
+    - Echoes / copies to clipboard data regarding an item. By default, this
+      copies the password of the item to the clipboard.
+3. $0 [-u|-p|-n|-U|-T] <title>[@<vault>] <new value>
+    - Sets an attribute of an item, creating it if it does not exist.
+4. $0 -e/--edit <title>[@<vault>]
+    - Edits the notes associated to an item, creating it if it does not exist.
+5. $0 -g [-N <reqs>] [-P <prefix>] [-S <suffix>] <title>[@<vault>]
+    - Generates a random password for an item according to certain requirements.
+6. $0 --rm <title>[@<vault>]
+    - Deletes an item.
+7. $0 -0/--logout
+    - Logs out of 1Password, terminating the latest session.
+8. $0 -h/--help
+    - Prints this manual.
+
+
+== Item specification ==
+
+Forms 2 to 6 of the command specify an item of one's 1Password database for
+query or modification. Such specification take the form
+
+    <title>[@<vault>]
+
+For instanace, if I want to query data about item \`Google' from vault
+\`Common', I would specify it as
+
+    Google@Common
+
+Spaces in item and vault names are permitted, provided they are escaped or
+quoted as the shell commands. If the vault is not specified, the user's
+default vault is assumed (typically the Private vault).
+
+
+== Initial setup ==
+
+The first time this tool is used, a sequence of interactive queries will
+grab one's main logon informations for 1Password, and save them for later
+usage in file \$HOME/.1p. One may redo this setup by adding option --setup to
+any form of the command.
+
+
+== Logging in and logging out ==
+
+1p is a wrapper around the \`op' utility developed by AgileBits. As such, it
+leverages op's login mechanism, which requests the input of one's master
+password to open a session. The result is a session token that 1p adds to
+\$HOME/.1p to take avoid inputting one's password on every call of a sequence.
+Given that this session token is saved in clear text in one's home directory,
+it is prudent to log out as soon as one is done with using 1Password for a
+while. One does so by invoking $0 with option --logout (shortened to -0).
+
+The session is automatically terminated after 30 minutes of command line
+inactivity.
+
+
+== Description of options ==
+
+-C / --copy       For data query (form 2), copies data to the clipboard
+                  (ignored when -j/--json is set). This behaviour is the
+                  default action for form 2.
+
+-E / --echo       For data query (form 2), echoes data to standard output.
+
+-N / --reqs       For password generation (form 5), specifies requirements
+                  regarding the random password. Takes the following form:
+
+                  -N <length>[:<n uppercase>[:<n digits>[:<n symbols>]]]
+
+                  For instance, to require a password of length 32 with at
+                  least 4 uppercase letters, at least 7 digits and at least
+                  2 symbols, one would specify
+
+                  --reqs=32:4:7:2
+
+                  Default requirements are 16:1:1:1
+
+                  Remark that the latter three requirements are not satisfied
+                  to exactitude: a password requested with, say, 4 uppercase
+                  letters, might end up having more. Only the password length
+                  is satisfied exactly. Also, bear in mind that this program
+                  has precious little patience with incoherent or insane
+                  password requirements. Irk it at your own peril.
+
+-P / --prefix     Sets a prefix for the randomly generated password (form 5).
+
+-S / --suffix     Sets a suffix for the randomly generated password (form 5).
+
+-T / --title      Queries or modifies the title of an item (forms 2 and 3).
+
+-U / --url        Queries or modifies the URL associated to an item (form 2
+                  and 3).
+
+-e / --edit       Invokes one's favourite \$EDITOR to modify the notes
+                  associated to an item (form 4). Once the user exits the
+                  editor, the notes are saved back to the 1Password database.
+
+-g / --generate   Generates a random password for the named item (form 5). If
+                  the named item does not exist when the command is invoked,
+                  it is created; otherwise, the password for the existing item
+                  is modified.
+
+-j / --json       For data queries (form 2), ignores field selection (options
+                  -u/--username, -p/--password, -n/--notes, -T/--title and
+                  -U/--url), and writes a JSON object with full data about the
+                  object to standard output.
+
+-n / --notes      Queries or modifies the notes associated to the named item
+                  (forms 2 and 3).
+
+-p / --password   Queries or modifies the password of the item (forms 2 and 3).
+                  This is the default attribute affected by these forms of the
+                  command.
+
+--raw             Forces non-JSON formatting of data query results (form 2),
+                  with attribute selection of the named item (through options
+                  -u, -p, -n, -T or -U) and the possibility of clipboard copy.
+
+--rm              Deletes ("trashes" in 1Password parlance) the named item
+                  from the database (form 6).
+
+--setup           Forces the initial setup sequence to be executed over, even
+                  after it has been done successfully once.
+
+-u / --user       Queries or modifies the username of the item (forms 2 and 3).
+
+-0 / --logout     Terminates the current 1Password session, invalidating and
+                  discarding the saved session token.
+
+
+== Author ==
+
+Benoit Hamelin <benoit@benoithamelin.com>
+June 2018
+HELP
+}
+
+
 function do_logout()
 {
     1p_op "signout" >/dev/null 2>&1
@@ -455,6 +603,8 @@ function do_logout()
     exit 0
 }
 
+
+#--- Entry point ------------------------------------------------------------
 
 num_params=""
 declare -a params
@@ -499,6 +649,9 @@ while [ -n "$1" ]; do
             ;;
         -g | --generate)
             action="generate"
+            ;;
+        -h | --help)
+            action="help"
             ;;
         -j | --json)
             format="json"
