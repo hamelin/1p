@@ -285,6 +285,126 @@ function do_edit()
 }
 
 
+function count_chars()
+{
+    tr -d "\n" <<<"$1" | jq --raw-input "explode | map(select($2)) | implode | length"
+}
+
+
+function count_uppers()
+{
+    count_chars "$1" '. >= 64 and . <= 90'
+}
+
+
+function count_digits()
+{
+    count_chars "$1" '. >= 48 and . <= 57'
+}
+
+
+function count_symbols()
+{
+    count_chars "$1" '[.] | inside("_-+=!@#$%&*()[]{}\\|;:,.<>/?~" | explode)'
+}
+
+
+function string_length()
+{
+    jq --raw-input 'length' <<<"$1"
+}
+
+
+function do_generate()
+{
+    if [ -z "${params[0]}" ]; then
+        echo "Specify the name of the item for which to generate a random password."
+        exit 41
+    fi
+
+    eval $(
+        jq --raw-output 'split(":") | map(try tonumber catch null) |
+            "length_total=\(.[0] // 16); num_uppers=\(.[1] // 1); num_digits=\(.[2] // 1); num_symbols=\(.[3] // 1)"' \
+            <<<"\"$length\""
+    ) || exit $?
+    local max_length=40
+    local min_length=8
+    local min_all_lower=16
+    if [ "$length_total" -gt "$max_length" ]; then
+        cat 2>/dev/null <<TOOLONG
+$length_total characters? Take a chill pill, buddy, and stick to $max_length or
+less. You know you might have to *type* this password sometimes, yes?
+Seriously. I'm setting you back at $max_length characters.
+TOOLONG
+        length_total=$max_length
+    elif [ $length_total -lt 8 ]; then
+        cat 2>/dev/null <<TOOSHORT
+$length_total characters. Come on, buddy. This is a computer, and this is the
+goddamn 21st century. In the overwhelming majority of cases, you will merely
+have to copy-paste this damn password. Geez, you people. I'm setting you up to
+$min_length characters, and I don't care whether you like it.
+TOOSHORT
+        length_total=$min_length
+    fi
+    if [ $num_uppers -lt 1 -a $num_digits -lt 1 -a $num_symbols -lt 1 -a $length_total -lt 16 ]; then
+        cat 2>/dev/null <<JUSTBAD
+You know, I've seen the XKCD cartoon and I know of the common password best
+practices, but you're taking this too far. Either you go long, or you go
+complex. I think that complex sucks, so I'm rising your password length to
+$min_all_lower characters. Don't thank me, I'm just a machine.
+JUSTBAD
+        length_total=$min_all_lower
+    fi
+
+    if [ $num_uppers -lt 0 ]; then
+        num_uppers=0
+    fi
+    if [ $num_digits -lt 0 ]; then
+        num_digits=0
+    fi
+    if [ $num_symbols -lt 0 ]; then
+        num_symbols=0
+    fi
+
+    local presuf="$prefix$suffix"
+    local length_middle=$(( $length_total - $(string_length "$presuf") ))
+    if [ $length_middle -le 0 ]; then
+        if [ $(count_uppers "$presuf") -lt $num_uppers -o \
+            $(count_digits "$presuf") -lt $num_digits -o \
+            $(count_symbols "$presuf") -lt $num_symbols ]
+        then
+            cat 2>/dev/null <<INCOHERENT
+Your prefix and suffix make up a password at least as long as you wish for,
+but without all the uppercase letters, digits or symbols you demand.  Get your
+act together and try again, buddy.
+INCOHERENT
+            exit 42
+        else
+            cat 2>/dev/null <<PRESUF
+Warning: the provided prefix and suffix suffice to satisfy all the constraints
+set on the final password, so it will bear no randomly generated component.
+PRESUF
+            password="$presuf"
+        fi
+    else
+        while true; do
+            local middle=$(head -c $length_middle /dev/urandom | \
+                tr '\000-\377' 'a-za-za-za-zA-ZA-ZA-Z0-90-90-9_+=!@#$%&*()[]{}|;:,.<>?~_+=!@#$%&*()[]{}|')
+            password="$prefix$middle$suffix"
+            if [ $(count_uppers "$password") -ge $num_uppers -a \
+                $(count_digits "$password") -ge $num_digits -a \
+                $(count_symbols "$password") -ge $num_symbols ]
+            then
+                break
+            fi
+        done
+    fi
+
+    echo "-- $password --" && exit 0
+    exec $0 --password "${params[0]}" "$password"
+}
+
+
 function do_rm()
 {
     ensure_login
@@ -329,8 +449,11 @@ action="default"
 format=""
 item="password"
 is_copy_or_echo="copy"
+length=16
+prefix=""
+suffix=""
 
-eval set -- $(getopt --name "$0" --options 'CETUehjnpu0' --longoptions 'copy,echo,title,url,edit,help,json,notes,password,raw,rm,setup,user,logout:' -- "$@") || exit $?
+eval set -- $(getopt --name "$0" --options 'CEN:P:S:TUeghjnpu0' --longoptions 'copy,echo,title,url,edit,generate,length:,prefix:,suffix:,help,json,notes,password,raw,rm,setup,user,logout:' -- "$@") || exit $?
 while [ -n "$1" ]; do
     case "$1" in
         # -h | --help)
@@ -342,6 +465,18 @@ while [ -n "$1" ]; do
         -E | --echo)
             is_copy_or_echo="echo"
             ;;
+        -N | --length)
+            length="$2"
+            shift
+            ;;
+        -P | --prefix)
+            prefix="$2"
+            shift
+            ;;
+        -S | --suffix)
+            suffix="$2"
+            shift
+            ;;
         -T | --title)
             item="title"
             ;;
@@ -350,6 +485,9 @@ while [ -n "$1" ]; do
             ;;
         -e | --edit)
             action="edit"
+            ;;
+        -g | --generate)
+            action="generate"
             ;;
         -j | --json)
             format="json"
