@@ -1,0 +1,6 @@
+#!/bin/bash
+p=$(mktemp)
+[ -z "$p" ] && exit 1
+sed -e "s/|||TAG|||/$(git describe --always --long)/g" 1p >$p
+install $p /usr/local/bin/1p
+rm -f $p
