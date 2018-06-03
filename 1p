@@ -540,6 +540,7 @@ set the username, and so on.
 Benoit Hamelin <benoit@benoithamelin.com>
 June 2018
 HELP
+    exit 0
 }
 
 
@@ -579,7 +580,7 @@ while [ -n "$1" ]; do
             action="edit"
             ;;
         -h | --help)
-            action="help"
+            do_help
             ;;
         -j | --json)
             format="json"
@@ -603,7 +604,7 @@ while [ -n "$1" ]; do
             item="username"
             ;;
         -V | --version)
-            action="version"
+            do_version
             ;;
         --)
             num_params=0
