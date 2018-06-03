@@ -1,13 +1,6 @@
 #!/bin/bash
 
 
-function unimplemented()
-{
-    echo "UNIMPLEMENTED"
-    exit 127
-}
-
-
 function 1p_op()
 {
     cmd="$1"
