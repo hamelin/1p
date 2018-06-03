@@ -436,11 +436,9 @@ $0 -- A more usabel command line interface to 1Password
     - Edits the notes associated to an item, creating it if it does not exist.
 5. $0 --rm <title>[@<vault>]
     - Deletes an item.
-6. $0 -0/--logout
-    - Logs out of 1Password, terminating the latest session.
-7. $0 -h/--help
+6. $0 -h/--help
     - Prints this manual and exits.
-8. $0 -V/--version
+7. $0 -V/--version
     - Echoes version and exits.
 
 
@@ -465,22 +463,22 @@ default vault is assumed (typically the Private vault).
 
 The first time this tool is used, a sequence of interactive queries will
 grab one's main logon informations for 1Password, and save them for later
-usage in file \$HOME/.1p. One may redo this setup by adding option --setup to
-any form of the command.
+usage in file \$HOME/.1p, in crypted form. One may redo this setup by adding
+option --setup to any form of the command.
 
 
 == Logging in and logging out ==
 
-1p is a wrapper around the \`op' utility developed by AgileBits. As such, it
-leverages op's login mechanism, which requests the input of one's master
-password to open a session. The result is a session token that 1p adds to
-\$HOME/.1p to take avoid inputting one's password on every call of a sequence.
-Given that this session token is saved in clear text in one's home directory,
-it is prudent to log out as soon as one is done with using 1Password for a
-while. One does so by invoking $0 with option --logout (shortened to -0).
-
-The session is automatically terminated after 30 minutes of command line
-inactivity.
+1p is a wrapper around the \`op' utility developed by AgileBits. However, op's
+login mechanism does not integrate with modern keyring systems typically used
+to store passwords to SSH and GPG keys. Thus, we wrap op's login into GPG
+cryptography. On initial setup, a GPG key is generated for identifier \`1p',
+and one is encouraged to use their 1Password master password to saveguard this
+key. It is used to encrypt the 1Password persistent configuration, and
+decrypt it whenever $0 is invoked. As GPG does properly rely on a session
+keyring, one only has to input either their key password once to include the
+key in their keyring, then their session (or keyring) password will provide
+session persistence.
 
 
 == Description of options ==
@@ -524,9 +522,6 @@ inactivity.
 
 -u / --user       Queries or modifies the username of the item (forms 2 and 3).
 
--0 / --logout     Terminates the current 1Password session, invalidating and
-                  discarding the saved session token (form 6).
-
 
 == Generating random passwords ==
 
@@ -548,14 +543,6 @@ HELP
 }
 
 
-function do_logout()
-{
-    1p_op "signout" >/dev/null 2>&1
-    set_token_auth ""
-    exit 0
-}
-
-
 function do_version()
 {
     echo "|||TAG|||"
@@ -573,7 +560,7 @@ format=""
 item="password"
 is_copy_or_echo="copy"
 
-eval set -- $(getopt --name "$0" --options 'CETUVehjnpu0' --longoptions 'copy,echo,title,url,version,edit,help,json,notes,password,raw,rm,setup,user,logout:' -- "$@") || exit $?
+eval set -- $(getopt --name "$0" --options 'CETUVehjnpu' --longoptions 'copy,echo,title,url,version,edit,help,json,notes,password,raw,rm,setup,user' -- "$@") || exit $?
 while [ -n "$1" ]; do
     case "$1" in
         -C | --copy)
@@ -614,9 +601,6 @@ while [ -n "$1" ]; do
             ;;
         -u | --user)
             item="username"
-            ;;
-        -0 | --logout)
-            action="logout"
             ;;
         -V | --version)
             action="version"
