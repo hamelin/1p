@@ -9,26 +9,141 @@ function 1p_op()
 }
 
 
-function setup_initial()
+function get_login_params()
 {
-    echo "Hello! Before we start, I need a few parameters from you. You can look them up"
-    echo "in the browser or desktop version of 1Password, typically somewhere around the"
-    echo "Preferences dialog."
-    echo
     read -p "Domain name: " domain && \
         read -p "E-mail address: " email && \
-        read -p "Secret key: " secret_key
-    cat > $path_config <<-CONFIG
+        read -p "Secret key: " secret_key && \
+        read -p "Master password (no echo): " -s master_password && \
+        echo
+}
+
+
+function login()
+{
+    token_auth=$(op signin --output=raw "$domain" "$email" "$secret_key" "$master_password")
+    return $?
+}
+
+
+function edit_login_params()
+{
+    while true; do
+        cat <<MENU
+Change parameter value?
+
+1) Domain:          $domain
+2) E-mail:          $email
+3) Secret key:      $secret_key
+4) Master password: <hidden>
+
+y) Try again with these parameters.
+n) Quit and go home.
+
+MENU
+        read -p "Choose wisely: "
+
+        case "$REPLY" in
+            1*)    read -p "Domain name: " domain                 ;;
+            2*)    read -p "E-mail address: " email               ;;
+            3*)    read -p "Secret key: " secret_key              ;;
+            4*)    read -p "Master password: " -s master_password
+                   echo                                           ;;
+            y*|Y*) break                                          ;;
+            n*|N*) exit 100                                       ;;
+            *)     echo "Come on, try harder!"                    ;;
+        esac
+        echo
+    done
+}
+
+
+function check_key_1p_ok()
+{
+    echo "You already have GPG key $key_id associated to identifier \`1p'."
+    read -p "Keep and use it? (y/n) "
+    case "$REPLY" in
+        y* | Y*)
+            return 0
+            ;;
+        n* | N*)
+            ;;
+        *)
+            echo "I'll take that as a \`no' and replace it with a new one."
+            echo
+            ;;
+    esac
+    if ! gpg --batch --quiet --yes --delete-secret-and-public-key \
+        $(gpg --with-colons --list-secret-keys $key_id | \
+            awk -F: '/^fpr/{print $10; exit 0}')
+    then
+        cat <<NOCLEANUP
+Unable to deleting key associated to identifier 1p. Please do some GPG
+clean-up and try again.
+NOCLEANUP
+        exit 102
+    fi
+    make_new_key_1p
+}
+
+
+function make_new_key_1p()
+{
+    cat <<GENERATING
+Generating new GPG key, which will be used for storage of your persistent
+configuration. You will be prompted to input a passphrase for this key: you
+should use one as strong as your 1Password master password -- it's ok to reuse
+your master password for this purpose. Until then, please move the mouse
+around to help generate some randomness for the process to progress...
+GENERATING
+    gpg --batch --quiet --quick-generate-key 1p </dev/null || exit $?
+    echo "Done!"
+    echo
+}
+
+
+function ensure_gpg_key_1p()
+{
+    key_id=$(gpg --batch --quiet --with-colons --list-secret-keys | \
+        awk -F: '/^sec/{key=$5} /^uid.*1p/{print key}')
+    case $(wc --words <<<"$key_id") in
+        0) make_new_key_1p ;;
+        1) check_key_1p_ok ;;
+        *)
+            cat <<KEY_CLEANUP
+You own multiple GPG keys for identifier \`1p'. Delete some of them, so as to
+have no more than one for this identifier, thereby resolving my confusion.
+KEY_CLEANUP
+            exit 101
+            ;;
+    esac
+}
+
+
+function setup_initial()
+{
+    ensure_gpg_key_1p
+    cat <<INTRO
+I now need a few parameters from you. You can look them up in the browser or
+desktop version of 1Password, typically somewhere around the Preferences
+dialog.
+
+INTRO
+    get_login_params
+    while ! login; do
+        edit_login_params
+    done
+    gpg --quiet --encrypt --recipient 1p <<-CONFIG >$path_config
 	{
 	    "domain": "$domain",
 	    "email": "$email",
 	    "secret_key": "$secret_key",
-	    "token_auth": ""
+	    "master_password": "$master_password"
 	}
 	CONFIG
     chmod 600 $path_config
-    token_auth=""
     echo "Persistent configuration saved."
+    echo
 }
 
 
@@ -43,14 +158,8 @@ function set_token_auth()
 
 function ensure_login()
 {
-    local msg_error=$(1p_op "get item" __dummy__ 2>&1)
-    if grep --quiet 'not currently signed in\|Authentication required' <<<"$msg_error" && [ "$action" != "logout" ]; then
-        local p=$(mktemp)
-        op signin --output=raw $domain $email $secret_key >$p && \
-            set_token_auth $(< $p)
-        local x=$?
-        rm -f $p
-        [ "$x" -ne 0 ] && exit $x
+    if [ -z "$token_auth" ]; then
+        login || exit $?
     fi
 }
 
@@ -532,8 +641,13 @@ declare -a config
 if [ ! -f "$path_config" -o -n "$is_setup_initial" ]; then
     setup_initial
 else
-    for name_config in domain email secret_key token_auth; do
-        value=$(jq --raw-output ".$name_config" $path_config)
+    config_json=$(gpg --quiet --decrypt <"$path_config")
+    if [ "$?" -ne 0 ]; then
+        echo "Unable to load persistent configuration; abort."
+        exit 7
+    fi
+    for name_config in domain email secret_key master_password; do
+        value=$(jq --raw-output ".$name_config" <<<"$config_json")
         eval "$name_config='$value'"
     done
 fi
