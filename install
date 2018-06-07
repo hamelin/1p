@@ -7,6 +7,9 @@ fi
 echo "Ensuring you have appropriate support packages."
 apt-get install curl jq pwgen gnupg || exit $?
 
+mkdir -p /usr/local/bin
+chmod 755 /usr/local/bin
+
 version_op_expected="0.4.1"
 if which op >/dev/null && [ $(op --version) = "$version_op_expected" ]; then
     echo "Proper version of command-line tool \`op' already installed -- all good."
