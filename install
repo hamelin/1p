@@ -1,4 +1,30 @@
 #!/bin/bash
+if [ $(id --user) -ne 0 ]; then
+    echo "Use sudo to run this as root."
+    exit 1
+fi
+
+echo "Ensuring you have appropriate support packages."
+apt-get install curl jq pwgen gnupg || exit $?
+
+version_op_expected="0.4.1"
+if which op >/dev/null && [ $(op --version) = "$version_op_expected" ]; then
+    echo "Proper version of command-line tool \`op' already installed -- all good."
+else
+    echo "Obtaining and installing command-line tool \`op', version $version_op_expected."
+    dirtemp=$(mktemp --directory)
+    test -z "$dirtemp" && exit 1
+    pushd $dirtemp
+    curl -o "op.zip" "https://cache.agilebits.com/dist/1P/op/pkg/v0.4.1/op_linux_amd64_v0.4.1.zip" && \
+        unzip -q op.zip && \
+        install op /usr/local/bin/op
+    x=$?
+    popd
+    rm -rf $dirtemp
+    test "$x" -ne 0 && exit $x
+fi
+
+echo "Deploying 1p tool."
 p=$(mktemp)
 [ -z "$p" ] && exit 1
 sed -e "s/|||TAG|||/$(git describe --always --long)/g" 1p >$p
