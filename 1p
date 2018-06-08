@@ -318,7 +318,9 @@ function set_item()
             url)   prompt="Enter new URL: "                     ;;
             *)     prompt="Enter new $item: "                   ;;
         esac
+		local is_input_tty=""
 		if ! tty >/dev/null; then
+			is_input_tty="yes"
 			cat 1>&2 <<DANGER
 Warning: password given through a redirected standard input. If input source
 can be replicated, or the password can be deduced or repeated from a command
@@ -330,6 +332,9 @@ DANGER
             mode_read="-s"
         fi
 		read $mode_read -p "$prompt" new_value
+		if [ "$mode_read" = "-s" -a -n "$is_input_tty" ]; then
+			echo
+		fi
     elif [ "$item" = "password" ]; then
         cat 1>&2 <<DANGER
 Warning: specifying passwords on the command line is *DANGEROUS*. Make sure
