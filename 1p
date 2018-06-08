@@ -311,6 +311,31 @@ function set_item()
     details=$(jq --raw-output '.details_raw' <<<"$item_raw")
 
     local new_value="${params[1]}"
+    if [ "$format" = "stdin" ]; then
+        local prompt
+        case "$item" in
+            notes) prompt="Type new notes over a single line: " ;;
+            url)   prompt="Enter new URL: "                     ;;
+            *)     prompt="Enter new $item: "                   ;;
+        esac
+		if ! tty >/dev/null; then
+			cat 1>&2 <<DANGER
+Warning: password given through a redirected standard input. If input source
+can be replicated, or the password can be deduced or repeated from a command
+line, the password is unsafe.
+DANGER
+		fi
+        local mode_read="-e"
+        if [ "$item" = "password" ]; then
+            mode_read="-s"
+        fi
+		read $mode_read -p "$prompt" new_value
+    elif [ "$item" = "password" ]; then
+        cat 1>&2 <<DANGER
+Warning: specifying passwords on the command line is *DANGEROUS*. Make sure
+clear your shell history ASAP.
+DANGER
+    fi
     case "$item" in
         password | username)
             details=$(jq --arg attr "$item" --arg new_value "$new_value" \
@@ -352,7 +377,13 @@ function do_default()
 
     case "$num_params" in
         0) list_items ;;
-        1) get_item   ;;
+        1)
+            if [ "$format" = "stdin" ]; then
+                set_item
+            else
+                get_item
+            fi
+            ;;
         *) set_item   ;;
     esac
 }
@@ -557,11 +588,11 @@ num_params=""
 declare -a params
 is_setup_initial=""
 action="default"
-format=""
+format="raw"
 item="password"
 is_copy_or_echo="copy"
 
-eval set -- $(getopt --name "$0" --options 'CETUVehjnpu' --longoptions 'copy,echo,title,url,version,edit,help,json,notes,password,raw,rm,setup,user' -- "$@") || exit $?
+eval set -- $(getopt --name "$0" --options 'CETUVehijnpu' --longoptions 'copy,echo,title,url,version,edit,help,input,json,notes,password,raw,rm,setup,user' -- "$@") || exit $?
 while [ -n "$1" ]; do
     case "$1" in
         -C | --copy)
@@ -581,6 +612,9 @@ while [ -n "$1" ]; do
             ;;
         -h | --help)
             do_help
+            ;;
+        -i | --input)
+            format="stdin"
             ;;
         -j | --json)
             format="json"
