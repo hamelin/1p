@@ -70,6 +70,19 @@ with spaces, using your shell quoting rules:
 $ 1p "Alternate Facebook" 'Str0ngPa$$w0rdN0T!'
 ```
 
+Honestly, entering passwords on the command line is a rather bad idea: not
+only does it require you to clean up your shell history afterwards, but while
+the `1p` process is running, the password may be obtained through
+`/proc/PID/cmdline`. Alternatively, you may input it from the keyboard, using
+option `-i`:
+
+```sh
+$ 1p -i google
+Enter new password:
+```
+
+The characters you input will not show -- it's a secret!
+
 If the service already exists in your 1Password database (as a *Login* item),
 the incumbent password is replaced; otherwise a new entry is created in the
 database. Other fields besides the password may be set using this command:
@@ -78,6 +91,9 @@ database. Other fields besides the password may be set using this command:
 - Notes associated to the entry: `1p -n google 'Always use a VPN to check this account.\n'`
 - The URL associated to the entry: `1p -U google https://gmail.com/`
 - You may also rename thus the entry: `1p -T google google-dolphinsausage`
+
+Again, option `-i` can be used in combination with the above to enter the
+attribute values from standard input instead of the command line.
 
 This is awesome, but how to fetch that information? Simply omit the setting
 (last parameter) from the command:
@@ -138,6 +154,17 @@ $ 1p -e "World domination plan"
 
 Once the editor exits, the notes as last saved into the editor are written
 back to the database.
+
+## Listing items in the 1Password database
+
+The simplest!
+
+```sh
+1p
+```
+
+The list shows, for each item, its UUID and the vault it lives in. Pipe in
+grep to look up specific vaults, etc.
 
 ## Deleting items
 
