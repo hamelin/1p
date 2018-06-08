@@ -301,7 +301,7 @@ function set_item()
 {
     map_vaults='{}'
     local p=$(mktemp)
-    get_item_from_1p_or_create >$p || exit $?
+    get_item_from_1p_or_create </dev/null >$p || exit $?
     trap "rm -f $p" EXIT
     local item_raw=$(cat $p && rm $p)
     uuid_orig=$(jq --raw-output '.uuid' <<<"$item_raw")
